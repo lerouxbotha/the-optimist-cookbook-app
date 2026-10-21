@@ -19,6 +19,6 @@ https://claude.ai/artifact/3otud1RsnLVJ4jgmbYRp2d
 Fonts: Optimist (titles, custom font) and Aleo (body, Google Fonts - the same body font the printed book uses).
 
 ## Data model (`recipes/<id>`)
-`title, section, page, serves, time, headnote, groups[{heading, ingredients[], steps[]}], tips[], caption, credit, book, origin (book|photo|social), photo (asset id), scans (asset ids), addedBy, addedAt`
+`title, section, page, serves, time, headnote, groups[{heading, ingredients[], steps[]}], tips[], caption, credit, book, origin (book|photo|social), photo (asset id), scans (asset ids), addedBy (account id), addedByName (the name the person typed), addedAt`
 
 Extra sections created in the app are stored in `meta/sections`.

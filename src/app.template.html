@@ -209,7 +209,8 @@ function sortKey(r) {
 function cmp(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; }
 
 function matches(r) {
-  if (S.section !== "all" && r.section !== S.section) return false;
+  if (S.section === "added") { if (isBook(r)) return false; }
+  else if (S.section !== "all" && r.section !== S.section) return false;
   if (!S.q) return true;
   const hay = norm([r.title, r.headnote, r.credit, ...(r.groups || []).flatMap(g => [g.heading, ...(g.ingredients || [])])].join(" "));
   return norm(S.q).split(/\s+/).every(w => hay.includes(w));
@@ -223,8 +224,9 @@ function renderChips() {
   for (const r of S.recipes) counts[r.section] = (counts[r.section] || 0) + 1;
   const mk = (id, name, n) => el("button", { class: "chip", "aria-pressed": String(S.section === id), onclick: () => { S.section = id; render(); } }, name, n != null ? el("small", { text: String(n) }) : null);
   box.append(mk("all", "All recipes", S.recipes.length));
-  for (const s of sections()) box.append(mk(s.id, s.name, counts[s.id] || 0));
   const added = S.recipes.filter(r => !isBook(r)).length;
+  if (added) box.append(mk("added", "Added by the family", added));
+  for (const s of sections()) box.append(mk(s.id, s.name, counts[s.id] || 0));
   document.getElementById("count").textContent = S.loaded ? `${S.recipes.length} recipes` + (added ? ` · ${added} added` : "") : "";
 }
 
@@ -239,7 +241,11 @@ function card(r) {
   return el("button", { class: "card", onclick: () => open(r.id) }, ph, el("span", { class: "t", text: r.title }), el("span", { class: "meta", text: meta }));
 }
 function emptyPh(r) { return el("div", { class: "ph empty" }, el("span", { text: r.title })); }
-function addedByText(r) { const n = r.addedBy && S.names[r.addedBy]; return n ? "Added by " + n : "Added by the family"; }
+function addedByText(r) { const n = r.addedByName || (r.addedBy && S.names[r.addedBy]); return n ? "Added by " + n : "Added by the family"; }
+const NAME_KEY = "optimist-cookbook-name";
+function savedName() { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } }
+function rememberName(n) { try { localStorage.setItem(NAME_KEY, n); } catch {} }
+async function defaultName() { return savedName() || (C.user ? (await C.user.me().catch(() => null))?.name || "" : ""); }
 
 function renderList() {
   const v = document.getElementById("view");
@@ -367,7 +373,9 @@ function openAdd() {
   const drawKinds = () => kinds.replaceChildren(
     el("button", { class: "kind", "aria-pressed": String(W.kind === "photo"), onclick: () => { W.kind = "photo"; drawKinds(); credit.hidden = true; } }, el("b", { text: "Photograph a recipe" }), el("span", { text: "A cookbook page, recipe card or Ouma’s handwriting. Use several photos for a long recipe." })),
     el("button", { class: "kind", "aria-pressed": String(W.kind === "social"), onclick: () => { W.kind = "social"; drawKinds(); credit.hidden = false; } }, el("b", { text: "Social media screenshot" }), el("span", { text: "A screenshot from Instagram, TikTok or Facebook. The app rewrites it in the cookbook format." })));
-  const [sel, nw] = sectionSelect(S.section !== "all" ? S.section : "", "add-sec");
+  const [sel, nw] = sectionSelect(S.section !== "all" && S.section !== "added" ? S.section : "", "add-sec");
+  const nameIn = el("input", { class: "in", id: "add-name", placeholder: "So everyone knows who shared it", autocomplete: "name" });
+  defaultName().then(n => { if (!nameIn.value) nameIn.value = n; });
   const thumbs = el("div", { class: "thumbs" });
   const input = el("input", { type: "file", accept, multiple: true, id: "add-files" });
   const redraw = () => { fileThumbs(thumbs, W.files, i => { W.files.splice(i, 1); redraw(); }, i => String(i + 1)); go.disabled = !W.files.length; };
@@ -385,6 +393,9 @@ function openAdd() {
   async function readRecipe() {
     const section = sel.value === "__new" ? newSectionId(nw.value) : sel.value;
     if (!section) { showStatus("Choose the section this recipe belongs in.", true); sel.focus(); return; }
+    const who = nameIn.value.trim();
+    if (!who) { showStatus("Add your name so the recipe shows who added it.", true); nameIn.focus(); return; }
+    rememberName(who);
     const ctl = new AbortController(); W.busy = ctl;
     go.disabled = true; cancel.textContent = "Stop";
     cancel.onclick = () => ctl.abort();
@@ -394,7 +405,7 @@ function openAdd() {
       const res = await C.sample.json(prompt(W.kind, W.files.length, document.getElementById("add-credit")?.value || ""), { images: imgs, signal: ctl.signal });
       if (!res || res.error || !res.title) { showStatus(res?.error === "no recipe found" ? "I couldn’t find a recipe in those photos. Try a sharper photo with the whole recipe in view." : "That didn’t come out as a recipe. Try again, or with clearer photos.", true); return; }
       W.busy = null;
-      openEditor({ draft: normalizeDraft(res), section, newSectionName: sel.value === "__new" ? nw.value.trim() : "", scansFiles: imgs, dish: W.dish, origin: W.kind });
+      openEditor({ draft: { ...normalizeDraft(res), addedByName: who }, section, newSectionName: sel.value === "__new" ? nw.value.trim() : "", scansFiles: imgs, dish: W.dish, origin: W.kind });
     } catch (e) {
       showStatus(sampleMsg(e), e?.code !== "cancelled");
     } finally {
@@ -406,6 +417,7 @@ function openAdd() {
   sheet(
     el("div", { class: "panelhead" }, el("div", {}, el("h2", { class: "t", text: "Add a recipe" }), el("p", { class: "sub", text: "The app reads the photos and lays the recipe out like a page of the book. You check it before it’s saved." })), el("button", { class: "x", "aria-label": "Close", onclick: () => closeSheet() }, "×")),
     kinds,
+    el("label", { class: "f", for: "add-name" }, "Your name"), nameIn,
     el("label", { class: "f", for: "add-sec" }, "Section"), sel, nw,
     el("label", { class: "f", for: "add-files" }, "Recipe photos ", el("small", { text: `(up to ${maxN}, in page order)` })),
     el("div", { class: "drop" }, el("button", { class: "btn primary", onclick: () => input.click() }, "Take or choose photos"), el("span", { class: "hint", text: "On your phone, choose Take Photo or Camera to use the camera." }), input, thumbs),
@@ -517,6 +529,7 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     ...f("ed-steps", "Method", "", { area: true, h: 200, small: "(one step per line, using the same part names)" }),
     ...f("ed-tips", "Tips", "", { area: true, h: 70, small: "(one per line, optional)" }),
     ...f("ed-credit", "Credit", r.credit, { ph: "@creator, a book, or who gave you the recipe", small: "(optional)" }),
+    ...(editing && isBook(recipe) ? [] : f("ed-who", "Added by", r.addedByName, { ph: "Your name" })),
   ];
   const statusBox = el("div");
   const save = el("button", { class: "btn primary", onclick: () => doSave() }, editing ? "Save changes" : "Add to the cookbook");
@@ -536,6 +549,8 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
   panel.querySelector("#ed-steps").value = groupsToText(r.groups, "steps");
   panel.querySelector("#ed-tips").value = (r.tips || []).join("\n");
   panel.querySelector("#ed-credit").value = r.credit || "";
+  const whoIn = panel.querySelector("#ed-who");
+  if (whoIn) whoIn.value = r.addedByName || (editing && recipe.addedBy && S.names[recipe.addedBy]) || "";
   const show = (m, err, spin) => statusBox.replaceChildren(el("div", { class: "status" + (err ? " err" : "") }, spin ? el("div", { class: "spin" }) : null, el("span", { text: m })));
 
   async function doSave() {
@@ -546,10 +561,13 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     if (!sec) { show("Choose a section.", true); return; }
     const groups = textToGroups(panel.querySelector("#ed-ing").value, panel.querySelector("#ed-steps").value);
     if (!groups.length) { show("Add at least the ingredients or the method.", true); return; }
+    const who = whoIn ? whoIn.value.trim() : "";
+    if (whoIn && !who) { show("Add the name of the person who added this recipe.", true); whoIn.focus(); return; }
     save.disabled = true; show("Saving…", false, true);
     try {
       if (sel.value === "__new") await addSection(sec, nw.value.trim());
       const data = { title, section: sec, serves: v("#ed-serves"), time: v("#ed-time"), headnote: v("#ed-head"), groups, tips: panel.querySelector("#ed-tips").value.split("\n").map(s => s.trim()).filter(Boolean), credit: v("#ed-credit") };
+      if (whoIn) data.addedByName = who;
       if (editing) {
         await C.db.doc("recipes/" + recipe.id).update(data);
         closeSheet(); render();
