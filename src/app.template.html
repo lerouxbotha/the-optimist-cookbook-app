@@ -1,0 +1,615 @@
+<title>The Optimist Cookbook App</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Aleo:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: the book's cover (orange texture, charcoal band) as the app bar; white recipe pages with the Optimist title over a heavy grey rule. */
+@font-face { font-family: "Optimist"; src: url(data:font/ttf;base64,__OPTIMIST__) format("truetype"); font-display: swap; }
+:root {
+  --orange: #EC6C22;
+  --orange-ink: #B4480F;
+  --charcoal: #1D201D;
+  --paper: #FFFFFF;
+  --page: #F6F4F1;
+  --ink: #232523;
+  --muted: #696560;
+  --rule: #6E6E6E;
+  --line: #E2DED8;
+  --card: #FFFFFF;
+  --danger: #B3261E;
+  --title: "Optimist", "Aleo", Georgia, serif;
+  --body: "Aleo", Georgia, "Times New Roman", serif;
+  --tex: url(data:image/jpeg;base64,__TEXTURE__);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --orange: #F07A33; --orange-ink: #F49A62; --charcoal: #0F110F; --paper: #1C1F1C; --page: #141614;
+  --ink: #ECE8E2; --muted: #A9A49C; --rule: #8E8E8E; --line: #2E322E; --card: #1C1F1C; --danger: #F2827A; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --orange: #F07A33; --orange-ink: #F49A62; --charcoal: #0F110F; --paper: #1C1F1C; --page: #141614;
+  --ink: #ECE8E2; --muted: #A9A49C; --rule: #8E8E8E; --line: #2E322E; --card: #1C1F1C; --danger: #F2827A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--page); color: var(--ink); }
+body { font-family: var(--body); font-size: 16px; line-height: 1.55; -webkit-text-size-adjust: 100%; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.t { font-family: var(--title); font-weight: normal; letter-spacing: .01em; text-wrap: balance; }
+
+/* Cover header */
+.cover { background: var(--orange) var(--tex) center / cover; color: #151715; }
+.cover .wrap { padding-block: 22px 18px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.kicker { font-family: var(--body); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; border-bottom: 1px solid #151715; padding-bottom: 4px; display: inline-block; margin-bottom: 10px; }
+.cover h1 { margin: 0; font-size: clamp(34px, 9vw, 58px); line-height: .95; }
+.cover .count { font-size: 13px; text-align: right; white-space: nowrap; }
+.band { background: var(--charcoal); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--charcoal); }
+.band .wrap { padding-block: 10px; display: flex; flex-direction: column; gap: 10px; }
+.search { width: 100%; border: 0; border-radius: 999px; padding: 10px 16px; background: #F4F1EC; color: #1D201D; font-size: 16px; }
+.search::placeholder { color: #75706A; }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid #4A4F4A; background: transparent; color: #EDEAE4; border-radius: 999px; padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+.chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #151715; }
+.chip small { opacity: .7; margin-left: 4px; }
+
+/* List */
+main { padding-block: 18px 120px; }
+.notice { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+.notice.warn { border-color: var(--orange); }
+.secthead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 26px 0 12px; border-bottom: 4px solid var(--rule); padding-bottom: 6px; }
+.secthead:first-child { margin-top: 4px; }
+.secthead h2 { margin: 0; font-size: 26px; line-height: 1.1; }
+.secthead span { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 18px 14px; }
+.card { display: flex; flex-direction: column; gap: 8px; text-align: left; background: none; border: 0; padding: 0; min-width: 0; }
+.ph { width: 100%; aspect-ratio: 3 / 4; border-radius: 6px; overflow: hidden; background: var(--line); position: relative; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+.card:hover .ph img { transform: scale(1.03); }
+.ph.empty { display: grid; place-items: center; background: var(--orange) var(--tex) center / cover; }
+.ph.empty span { font-family: var(--title); font-size: 15px; color: #151715; padding: 12px; text-align: center; line-height: 1.15; }
+.tag { position: absolute; left: 8px; top: 8px; background: var(--charcoal); color: #EDEAE4; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+.card .t { font-size: 17px; line-height: 1.15; }
+.card .meta { font-size: 12px; color: var(--muted); margin-top: -4px; }
+.empty-state { text-align: center; padding: 48px 16px; color: var(--muted); }
+.empty-state .t { font-size: 24px; color: var(--ink); display: block; margin-bottom: 6px; }
+
+/* Recipe page */
+.recipe { background: var(--paper); border-radius: 10px; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 860px) { .recipe { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); } .recipe .hero { order: 2; } .recipe .hero img { height: 100%; max-height: none; position: sticky; top: 0; } }
+.hero img { width: 100%; max-height: 62vh; object-fit: cover; display: block; }
+.rbody { padding: 22px 20px 30px; min-width: 0; }
+@media (min-width: 600px) { .rbody { padding: 34px 38px 40px; } }
+.back { background: none; border: 0; padding: 0; color: var(--orange-ink); font-size: 15px; margin-bottom: 14px; }
+.rtitle { font-size: clamp(28px, 6vw, 40px); line-height: 1.05; margin: 0; padding-bottom: 10px; border-bottom: 5px solid var(--rule); }
+.headnote { margin: 16px 0 10px; }
+.yield { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; margin: 10px 0 18px; }
+.yield b { font-weight: 600; }
+.group { margin-top: 18px; }
+.group h3 { font-family: var(--body); font-weight: 700; font-size: 16px; margin: 0 0 8px; }
+.ings { list-style: none; margin: 0 0 12px; padding: 0 0 0 16px; columns: 1; column-gap: 28px; font-size: 14.5px; }
+@media (min-width: 600px) { .ings { columns: 2; } }
+.ings li { break-inside: avoid; padding: 3px 0; }
+.steps { margin: 0; padding-left: 22px; }
+.steps li { margin-bottom: 9px; padding-left: 2px; }
+.steps li::marker { font-family: var(--title); color: var(--orange-ink); }
+.tip { margin-top: 18px; padding: 12px 14px; border-left: 4px solid var(--orange); background: var(--page); border-radius: 0 6px 6px 0; }
+.caption { margin-top: 18px; font-family: var(--title); font-size: 15px; color: var(--muted); }
+.source { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 9px 18px; font-size: 15px; }
+.btn.primary { background: var(--orange); border-color: var(--orange); color: #151715; font-weight: 600; }
+.btn.danger { color: var(--danger); border-color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: default; }
+.scans { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.scans a img { width: 72px; height: 96px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+
+/* Add button */
+.fab { position: fixed; right: max(18px, calc(env(safe-area-inset-right, 0px) + 12px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 6; display: flex; align-items: center; gap: 8px; background: var(--orange); color: #151715; border: 0; border-radius: 999px; padding: 14px 22px 14px 18px; font-family: var(--title); font-size: 19px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.fab svg { width: 22px; height: 22px; }
+
+/* Sheet */
+.sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: flex; justify-content: center; align-items: flex-end; }
+@media (min-width: 700px) { .sheet { align-items: center; } }
+.panel { background: var(--paper); width: 100%; max-width: 640px; max-height: 100%; overflow-y: auto; border-radius: 14px 14px 0 0; padding: 20px max(18px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 700px) { .panel { border-radius: 14px; max-height: 92vh; } }
+.panel h2 { margin: 0 0 4px; font-size: 28px; }
+.panel .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+.panelhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.x { background: none; border: 0; font-size: 26px; line-height: 1; padding: 4px 8px; color: var(--muted); }
+.kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.kind { border: 2px solid var(--line); background: var(--card); border-radius: 10px; padding: 14px 12px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.kind b { font-family: var(--title); font-weight: normal; font-size: 18px; line-height: 1.1; }
+.kind span { font-size: 13px; color: var(--muted); line-height: 1.35; }
+.kind[aria-pressed="true"] { border-color: var(--orange); }
+label.f { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+label.f small { font-weight: 400; color: var(--muted); }
+.in { width: 100%; border: 1px solid var(--line); background: var(--page); border-radius: 8px; padding: 10px 12px; font-size: 16px; }
+textarea.in { min-height: 120px; resize: vertical; line-height: 1.45; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row2 > div { min-width: 0; }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.drop input { display: none; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.thumb { position: relative; }
+.thumb img { width: 76px; height: 100px; object-fit: cover; border-radius: 6px; display: block; }
+.thumb button { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--charcoal); color: #fff; font-size: 14px; line-height: 1; }
+.thumb i { position: absolute; left: 4px; bottom: 4px; font-style: normal; font-size: 11px; background: var(--charcoal); color: #fff; border-radius: 999px; padding: 0 6px; }
+.status { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: var(--page); font-size: 14px; display: flex; gap: 10px; align-items: center; }
+.status.err { border: 1px solid var(--danger); color: var(--danger); background: transparent; }
+.spin { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--orange); animation: sp 0.9s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } .card:hover .ph img { transform: none; } }
+.hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+.confirm { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--danger); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.confirm p { margin: 0; flex: 1 1 200px; }
+</style>
+
+<header class="cover gutter">
+  <div class="wrap">
+    <div>
+      <span class="kicker">Recipes for optimists by an optimist</span>
+      <h1 class="t">The Optimist<br>Cookbook</h1>
+    </div>
+    <div class="count" id="count"></div>
+  </div>
+</header>
+<div class="band gutter" id="band">
+  <div class="wrap">
+    <input class="search" id="q" type="search" placeholder="Search recipes or ingredients" autocomplete="off" aria-label="Search recipes or ingredients">
+    <div class="chips" id="chips" role="toolbar" aria-label="Sections"></div>
+  </div>
+</div>
+<main class="gutter"><div class="wrap" id="view"></div></main>
+<button class="fab" id="fab" hidden aria-label="Add a recipe">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  Add recipe
+</button>
+<div id="sheet-root"></div>
+
+<script>
+const BASE_SECTIONS = [
+  { id: "padkos", name: "Padkos" },
+  { id: "tv", name: "Cooking with TV" },
+  { id: "family", name: "Family Favourites" },
+  { id: "sweet", name: "Sweet Dreams" },
+  { id: "drinks", name: "Cocktails and Drinks" },
+];
+const BOOK = "The Optimist Cookbook";
+const S = { recipes: [], loaded: false, extra: [], section: "all", q: "", canWrite: null, names: {} };
+const C = { db: null, user: null, assets: null, sample: null, limits: null };
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (k === "text") n.textContent = v;
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c instanceof Node ? c : String(c));
+  return n;
+}
+const sections = () => BASE_SECTIONS.concat(S.extra.filter(x => !BASE_SECTIONS.some(b => b.id === x.id)));
+const sectionName = id => (sections().find(s => s.id === id) || {}).name || "Other";
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const photoSrc = id => (id ? "/_blob/" + id : null);
+const isBook = r => r.book === BOOK;
+
+function sortKey(r) {
+  const i = sections().findIndex(s => s.id === r.section);
+  return [i < 0 ? 99 : i, isBook(r) ? 0 : 1, isBook(r) ? (r.page || 0) : -(r.addedAt || 0)];
+}
+function cmp(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; }
+
+function matches(r) {
+  if (S.section !== "all" && r.section !== S.section) return false;
+  if (!S.q) return true;
+  const hay = norm([r.title, r.headnote, r.credit, ...(r.groups || []).flatMap(g => [g.heading, ...(g.ingredients || [])])].join(" "));
+  return norm(S.q).split(/\s+/).every(w => hay.includes(w));
+}
+
+/* ---------- Header chips ---------- */
+function renderChips() {
+  const box = document.getElementById("chips");
+  box.replaceChildren();
+  const counts = {};
+  for (const r of S.recipes) counts[r.section] = (counts[r.section] || 0) + 1;
+  const mk = (id, name, n) => el("button", { class: "chip", "aria-pressed": String(S.section === id), onclick: () => { S.section = id; render(); } }, name, n != null ? el("small", { text: String(n) }) : null);
+  box.append(mk("all", "All recipes", S.recipes.length));
+  for (const s of sections()) box.append(mk(s.id, s.name, counts[s.id] || 0));
+  const added = S.recipes.filter(r => !isBook(r)).length;
+  document.getElementById("count").textContent = S.loaded ? `${S.recipes.length} recipes` + (added ? ` · ${added} added` : "") : "";
+}
+
+/* ---------- List view ---------- */
+function card(r) {
+  const src = photoSrc(r.photo);
+  const ph = src
+    ? el("div", { class: "ph" }, el("img", { src, alt: "", loading: "lazy", onerror: e => { e.target.parentNode.replaceWith(emptyPh(r)); } }))
+    : emptyPh(r);
+  if (!isBook(r)) ph.append(el("span", { class: "tag", text: r.origin === "social" ? "Social" : "Added" }));
+  const meta = isBook(r) ? `p. ${r.page}` : (r.credit ? r.credit : addedByText(r));
+  return el("button", { class: "card", onclick: () => open(r.id) }, ph, el("span", { class: "t", text: r.title }), el("span", { class: "meta", text: meta }));
+}
+function emptyPh(r) { return el("div", { class: "ph empty" }, el("span", { text: r.title })); }
+function addedByText(r) { const n = r.addedBy && S.names[r.addedBy]; return n ? "Added by " + n : "Added by the family"; }
+
+function renderList() {
+  const v = document.getElementById("view");
+  v.replaceChildren();
+  if (!S.loaded) {
+    v.append(el("div", { class: "empty-state" }, el("span", { class: "t", text: "Opening the cookbook…" }), C.db === false ? null : "Fetching the recipes."));
+    return;
+  }
+  const list = S.recipes.filter(matches).sort(cmp);
+  if (!S.recipes.length) {
+    v.append(el("div", { class: "empty-state" }, el("span", { class: "t", text: "No recipes yet" }), "Tap Add recipe to photograph the first one."));
+    return;
+  }
+  if (!list.length) {
+    v.append(el("div", { class: "empty-state" }, el("span", { class: "t", text: "Nothing matches" }), `No recipe mentions “${S.q}”. Try another word.`));
+    return;
+  }
+  const bySec = new Map();
+  for (const r of list) { if (!bySec.has(r.section)) bySec.set(r.section, []); bySec.get(r.section).push(r); }
+  for (const [sec, rs] of bySec) {
+    v.append(el("div", { class: "secthead" }, el("h2", { class: "t", text: sectionName(sec) }), el("span", { text: rs.length + (rs.length === 1 ? " recipe" : " recipes") })));
+    v.append(el("div", { class: "grid" }, rs.map(card)));
+  }
+}
+
+/* ---------- Recipe view ---------- */
+function renderRecipe(r) {
+  const v = document.getElementById("view");
+  v.replaceChildren();
+  const body = el("div", { class: "rbody" });
+  body.append(el("button", { class: "back", onclick: () => { location.hash = ""; } }, "← All recipes"));
+  body.append(el("h1", { class: "rtitle t", text: r.title }));
+  if (r.headnote) body.append(el("p", { class: "headnote", text: r.headnote }));
+  const y = [];
+  if (r.serves) y.push(el("span", {}, el("b", { text: /^(makes|serves)\b/i.test(r.serves) ? "" : "Serves " }), r.serves));
+  if (r.time) y.push(el("span", {}, el("b", { text: "Total " }), r.time));
+  if (y.length) body.append(el("div", { class: "yield" }, y.flatMap((n, i) => (i ? [" | ", n] : [n]))));
+  for (const g of r.groups || []) {
+    const box = el("div", { class: "group" });
+    if (g.heading) box.append(el("h3", { text: g.heading }));
+    if (g.ingredients?.length) box.append(el("ul", { class: "ings" }, g.ingredients.map(t => el("li", { text: t }))));
+    if (g.steps?.length) box.append(el("ol", { class: "steps" }, g.steps.map(t => el("li", { text: t }))));
+    body.append(box);
+  }
+  for (const t of r.tips || []) body.append(el("div", { class: "tip" }, el("b", { text: "Tip: " }), t));
+  if (r.caption) body.append(el("div", { class: "caption", text: r.caption }));
+  const src = [el("span", { text: isBook(r) ? `${BOOK}, page ${r.page}` : addedByText(r) }), el("span", { text: sectionName(r.section) })];
+  if (r.credit) src.push(el("span", { text: "Credit: " + r.credit }));
+  body.append(el("div", { class: "source" }, src));
+  if (r.scans?.length) body.append(el("div", { class: "hint", text: "Original photos" }), el("div", { class: "scans" }, r.scans.map(id => el("a", { href: photoSrc(id), target: "_blank", rel: "noopener" }, el("img", { src: photoSrc(id), alt: "Original recipe photo" })))));
+  if (S.canWrite !== false && C.db) {
+    const acts = el("div", { class: "actions" }, el("button", { class: "btn", onclick: () => openEditor({ recipe: r }) }, "Edit recipe"));
+    if (!isBook(r)) {
+      const del = el("button", { class: "btn danger", onclick: () => {
+        if (acts.nextSibling?.classList?.contains("confirm")) return;
+        const c = el("div", { class: "confirm" }, el("p", { text: `Delete “${r.title}” from the cookbook for everyone?` }),
+          el("button", { class: "btn", onclick: () => c.remove() }, "Keep it"),
+          el("button", { class: "btn danger", onclick: async e => { e.target.disabled = true; try { await C.db.doc("recipes/" + r.id).delete(); location.hash = ""; } catch (err) { c.querySelector("p").textContent = "Could not delete it. " + dbMsg(err); e.target.disabled = false; } } }, "Delete"));
+        acts.after(c);
+      } }, "Delete");
+      acts.append(del);
+    }
+    body.append(acts);
+  }
+  const art = el("article", { class: "recipe" });
+  const hs = photoSrc(r.photo);
+  if (hs) art.append(el("div", { class: "hero" }, el("img", { src: hs, alt: r.title, onerror: e => e.target.parentNode.remove() })));
+  art.append(body);
+  v.append(art);
+  window.scrollTo({ top: document.getElementById("band").offsetTop });
+}
+
+function open(id) { location.hash = id; }
+function currentId() { return decodeURIComponent(location.hash.slice(1)); }
+
+function render() {
+  renderChips();
+  const id = currentId();
+  const r = id && S.recipes.find(x => x.id === id);
+  if (r) renderRecipe(r); else renderList();
+  if (S.notice) document.getElementById("view").prepend(el("div", { class: "notice warn", text: S.notice }));
+  document.getElementById("fab").hidden = !(C.db && S.canWrite !== false && C.sample);
+}
+window.addEventListener("hashchange", render);
+let qTimer;
+document.getElementById("q").addEventListener("input", e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); if (currentId()) location.hash = ""; render(); }, 120); });
+
+function dbMsg(e) {
+  if (e?.code === "quota_exceeded") return "The cookbook storage is full.";
+  if (e?.code === "invalid_argument") return "You don't have permission to change recipes. Ask Leroux to make you an Editor.";
+  return "Check your connection and try again.";
+}
+
+/* ---------- Add / edit sheet ---------- */
+const W = { kind: "photo", files: [], dish: null, busy: null };
+function closeSheet() { W.busy?.abort(); W.busy = null; document.getElementById("sheet-root").replaceChildren(); document.body.style.overflow = ""; }
+function sheet(...kids) {
+  const root = document.getElementById("sheet-root");
+  const panel = el("div", { class: "panel", role: "dialog", "aria-modal": "true" }, kids);
+  const s = el("div", { class: "sheet", onclick: e => { if (e.target === s && !W.busy) closeSheet(); } }, panel);
+  root.replaceChildren(s);
+  document.body.style.overflow = "hidden";
+  return panel;
+}
+
+function sectionSelect(value, id) {
+  const sel = el("select", { class: "in", id }, el("option", { value: "", text: "Choose a section" }), sections().map(s => el("option", { value: s.id, text: s.name, selected: s.id === value })), el("option", { value: "__new", text: "+ New section…" }));
+  const nw = el("input", { class: "in", id: id + "-new", placeholder: "Name of the new section", hidden: true, style: "margin-top:8px" });
+  sel.addEventListener("change", () => { nw.hidden = sel.value !== "__new"; if (!nw.hidden) nw.focus(); });
+  return [sel, nw];
+}
+
+function fileThumbs(box, files, onRemove, label) {
+  box.replaceChildren(...files.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return el("div", { class: "thumb" }, el("img", { src: url, alt: "", onload: () => URL.revokeObjectURL(url) }), label ? el("i", { text: label(i) }) : null, el("button", { "aria-label": "Remove photo", onclick: () => onRemove(i) }, "×"));
+  }));
+}
+
+function openAdd() {
+  W.files = []; W.dish = null;
+  const maxN = C.limits?.images?.maxCount || 5;
+  const accept = (C.limits?.images?.mediaTypes || ["image/jpeg", "image/png", "image/webp"]).join(",") + ",image/*";
+  const kinds = el("div", { class: "kinds" });
+  const drawKinds = () => kinds.replaceChildren(
+    el("button", { class: "kind", "aria-pressed": String(W.kind === "photo"), onclick: () => { W.kind = "photo"; drawKinds(); credit.hidden = true; } }, el("b", { text: "Photograph a recipe" }), el("span", { text: "A cookbook page, recipe card or Ouma’s handwriting. Use several photos for a long recipe." })),
+    el("button", { class: "kind", "aria-pressed": String(W.kind === "social"), onclick: () => { W.kind = "social"; drawKinds(); credit.hidden = false; } }, el("b", { text: "Social media screenshot" }), el("span", { text: "A screenshot from Instagram, TikTok or Facebook. The app rewrites it in the cookbook format." })));
+  const [sel, nw] = sectionSelect(S.section !== "all" ? S.section : "", "add-sec");
+  const thumbs = el("div", { class: "thumbs" });
+  const input = el("input", { type: "file", accept, multiple: true, id: "add-files" });
+  const redraw = () => { fileThumbs(thumbs, W.files, i => { W.files.splice(i, 1); redraw(); }, i => String(i + 1)); go.disabled = !W.files.length; };
+  input.addEventListener("change", () => { W.files.push(...input.files); if (W.files.length > maxN) { W.files = W.files.slice(0, maxN); showStatus(`Only ${maxN} photos can be read at once. I kept the first ${maxN}.`, true); } input.value = ""; redraw(); });
+  const dishThumb = el("div", { class: "thumbs" });
+  const dishIn = el("input", { type: "file", accept: "image/*", id: "add-dish" });
+  const redrawDish = () => fileThumbs(dishThumb, W.dish ? [W.dish] : [], () => { W.dish = null; redrawDish(); });
+  dishIn.addEventListener("change", () => { W.dish = dishIn.files[0] || null; dishIn.value = ""; redrawDish(); });
+  const credit = el("div", { hidden: W.kind !== "social" }, el("label", { class: "f", for: "add-credit" }, "Creator or link ", el("small", { text: "(optional, the app also looks for it)" })), el("input", { class: "in", id: "add-credit", placeholder: "@handle or link to the post" }));
+  const statusBox = el("div");
+  function showStatus(msg, err, spin) { statusBox.replaceChildren(el("div", { class: "status" + (err ? " err" : "") }, spin ? el("div", { class: "spin" }) : null, el("span", { text: msg }))); }
+  const go = el("button", { class: "btn primary", disabled: true, onclick: () => readRecipe() }, "Read recipe");
+  const cancel = el("button", { class: "btn", onclick: () => closeSheet() }, "Cancel");
+
+  async function readRecipe() {
+    const section = sel.value === "__new" ? newSectionId(nw.value) : sel.value;
+    if (!section) { showStatus("Choose the section this recipe belongs in.", true); sel.focus(); return; }
+    const ctl = new AbortController(); W.busy = ctl;
+    go.disabled = true; cancel.textContent = "Stop";
+    cancel.onclick = () => ctl.abort();
+    showStatus("Reading your recipe… this usually takes 20 to 60 seconds.", false, true);
+    try {
+      const imgs = await Promise.all(W.files.map(f => shrink(f, 1800)));
+      const res = await C.sample.json(prompt(W.kind, W.files.length, document.getElementById("add-credit")?.value || ""), { images: imgs, signal: ctl.signal });
+      if (!res || res.error || !res.title) { showStatus(res?.error === "no recipe found" ? "I couldn’t find a recipe in those photos. Try a sharper photo with the whole recipe in view." : "That didn’t come out as a recipe. Try again, or with clearer photos.", true); return; }
+      W.busy = null;
+      openEditor({ draft: normalizeDraft(res), section, newSectionName: sel.value === "__new" ? nw.value.trim() : "", scansFiles: imgs, dish: W.dish, origin: W.kind });
+    } catch (e) {
+      showStatus(sampleMsg(e), e?.code !== "cancelled");
+    } finally {
+      if (W.busy === ctl) W.busy = null;
+      go.disabled = !W.files.length; cancel.textContent = "Cancel"; cancel.onclick = () => closeSheet();
+    }
+  }
+
+  sheet(
+    el("div", { class: "panelhead" }, el("div", {}, el("h2", { class: "t", text: "Add a recipe" }), el("p", { class: "sub", text: "The app reads the photos and lays the recipe out like a page of the book. You check it before it’s saved." })), el("button", { class: "x", "aria-label": "Close", onclick: () => closeSheet() }, "×")),
+    kinds,
+    el("label", { class: "f", for: "add-sec" }, "Section"), sel, nw,
+    el("label", { class: "f", for: "add-files" }, "Recipe photos ", el("small", { text: `(up to ${maxN}, in page order)` })),
+    el("div", { class: "drop" }, el("button", { class: "btn primary", onclick: () => input.click() }, "Take or choose photos"), el("span", { class: "hint", text: "On your phone, choose Take Photo or Camera to use the camera." }), input, thumbs),
+    credit,
+    el("label", { class: "f", for: "add-dish" }, "Photo of the finished dish ", el("small", { text: "(optional)" })),
+    el("div", {}, el("button", { class: "btn", onclick: () => dishIn.click() }, "Add a dish photo"), dishIn, dishThumb),
+    statusBox,
+    el("div", { class: "foot" }, cancel, go),
+  );
+  drawKinds();
+}
+
+function newSectionId(name) { const n = name.trim(); if (!n) return ""; return "s-" + norm(n).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40); }
+
+function prompt(kind, n, creditHint) {
+  const what = kind === "social"
+    ? `${n === 1 ? "a screenshot" : n + " screenshots"} of a recipe posted on social media`
+    : `${n === 1 ? "a photo" : n + " photos"} of a recipe (a cookbook page, a recipe card or a handwritten note)`;
+  return `You are formatting a recipe for "The Optimist Cookbook", a South African family cookbook.
+The images are ${what}.${n > 1 ? " They show one recipe, in order." : ""}${creditHint ? `\nThe person adding it says the creator is: ${creditHint}` : ""}
+
+Read the recipe and reply with only this JSON object:
+{"title": string, "headnote": string, "serves": string, "time": string, "groups": [{"heading": string, "ingredients": [string], "steps": [string]}], "tips": [string], "credit": string, "unreadable": string}
+
+Rules:
+- Copy every quantity, unit and ingredient exactly as written. Never invent, guess or convert an amount.
+- Use one group per part of the recipe, with a heading like "For the dough" or "For the sauce". A recipe with one part has a single group whose heading is "".
+- Each step is one short instruction in the imperative, in the original order.
+- "serves": the yield as written, for example "4" or "Makes 24". "time": the total time as written. Use "" when the source does not say.
+- "headnote": one or two warm sentences introducing the dish, based only on what the source says (for a social post, its caption). Use "" if there is nothing to base it on.
+- Put serving suggestions and tips from the source in "tips".
+- Keep the recipe in its original language (English or Afrikaans). Fix obvious spelling mistakes only.
+- "credit": for a social post, the creator's name or @handle as shown; for a printed book, its title if visible; otherwise "".
+- Ignore likes, comments, hashtags, ads, app buttons and other interface text.
+- Write the title in title case.
+- "unreadable": name anything you could not read, or "".
+If the images contain no recipe, reply with {"error": "no recipe found"}.`;
+}
+
+function normalizeDraft(d) {
+  const arr = x => (Array.isArray(x) ? x.map(s => String(s ?? "").trim()).filter(Boolean) : []);
+  const groups = (Array.isArray(d.groups) ? d.groups : []).map(g => ({ heading: String(g?.heading || "").trim(), ingredients: arr(g?.ingredients), steps: arr(g?.steps) })).filter(g => g.ingredients.length || g.steps.length);
+  return { title: String(d.title || "").trim(), headnote: String(d.headnote || "").trim(), serves: String(d.serves || "").trim(), time: String(d.time || "").trim(), groups, tips: arr(d.tips), credit: String(d.credit || "").trim(), unreadable: String(d.unreadable || "").trim() };
+}
+
+function sampleMsg(e) {
+  switch (e?.code) {
+    case "cancelled": return "Stopped. Nothing was saved.";
+    case "not_granted": case "sampling_disabled": return "Reading photos needs your permission to use Claude. Reload the page and choose Allow when asked.";
+    case "rate_limited": return "Claude is busy or your usage limit is reached. Wait a few minutes and try again.";
+    case "image_rejected": return "One of the photos couldn’t be read. Try a JPEG or PNG under 20 MB.";
+    case "images_unavailable": return "This view can’t send photos. Open the app on claude.ai in a browser or the Claude app.";
+    case "invalid_json": case "empty_completion": return "The recipe didn’t come back in the right shape. Tap Read recipe to try again.";
+    case "session_expired": return "You’ve been signed out of Claude. Sign in again and retry.";
+    case "refused": return "Claude couldn’t process those photos. Try different ones.";
+    default: return "Something went wrong while reading the recipe. Check your connection and try again.";
+  }
+}
+
+async function shrink(file, max) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    return await new Promise(res => c.toBlob(b => res(b || file), "image/jpeg", 0.85));
+  } catch { return file; }
+}
+
+/* Text <-> groups: a line ending in ":" starts a part of the recipe. */
+function groupsToText(groups, key) {
+  return (groups || []).filter(g => g[key]?.length || (key === "ingredients" && g.heading)).map(g => (g.heading ? g.heading.replace(/:$/, "") + ":\n" : "") + g[key].join("\n")).join("\n\n");
+}
+function parseLines(text) {
+  const out = []; let cur = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim().replace(/^[-•*]\s+/, "").replace(/^\d+[.)]\s+/, "");
+    if (!line) continue;
+    if (/:$/.test(line) && line.length < 70) { cur = { heading: line.replace(/:$/, ""), items: [] }; out.push(cur); continue; }
+    if (!cur) { cur = { heading: "", items: [] }; out.push(cur); }
+    cur.items.push(line);
+  }
+  return out;
+}
+function textToGroups(ingText, stepText) {
+  const groups = [];
+  const find = h => groups.find(g => norm(g.heading) === norm(h));
+  for (const g of parseLines(ingText)) groups.push({ heading: g.heading, ingredients: g.items, steps: [] });
+  for (const g of parseLines(stepText)) {
+    const hit = find(g.heading);
+    if (hit) hit.steps.push(...g.items); else groups.push({ heading: g.heading, ingredients: [], steps: g.items });
+  }
+  return groups.filter(g => g.ingredients.length || g.steps.length || g.heading);
+}
+
+function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, origin }) {
+  const r = recipe || draft;
+  const editing = !!recipe;
+  const [sel, nw] = sectionSelect(editing ? recipe.section : section, "ed-sec");
+  if (newSectionName) { sel.value = "__new"; nw.hidden = false; nw.value = newSectionName; }
+  const f = (id, label, value, opts = {}) => [el("label", { class: "f", for: id }, label, opts.small ? el("small", { text: " " + opts.small }) : null), el(opts.area ? "textarea" : "input", { class: "in", id, placeholder: opts.ph || "", style: opts.h ? `min-height:${opts.h}px` : null })];
+  const fields = [
+    ...f("ed-title", "Title", r.title),
+    el("div", { class: "row2" }, el("div", {}, ...f("ed-serves", "Serves", r.serves, { ph: "4" })), el("div", {}, ...f("ed-time", "Total time", r.time, { ph: "1 hour" }))),
+    ...f("ed-head", "Introduction", r.headnote, { area: true, h: 80, small: "(the story behind the dish)" }),
+    ...f("ed-ing", "Ingredients", "", { area: true, h: 200, small: "(one per line; a line ending in “:” starts a part, like “For the sauce:”)" }),
+    ...f("ed-steps", "Method", "", { area: true, h: 200, small: "(one step per line, using the same part names)" }),
+    ...f("ed-tips", "Tips", "", { area: true, h: 70, small: "(one per line, optional)" }),
+    ...f("ed-credit", "Credit", r.credit, { ph: "@creator, a book, or who gave you the recipe", small: "(optional)" }),
+  ];
+  const statusBox = el("div");
+  const save = el("button", { class: "btn primary", onclick: () => doSave() }, editing ? "Save changes" : "Add to the cookbook");
+  const panel = sheet(
+    el("div", { class: "panelhead" }, el("div", {}, el("h2", { class: "t", text: editing ? "Edit recipe" : "Check the recipe" }), el("p", { class: "sub", text: editing ? "Changes show for everyone straight away." : "Compare it with your photos and fix anything the app misread." })), el("button", { class: "x", "aria-label": "Close", onclick: () => closeSheet() }, "×")),
+    draft?.unreadable ? el("div", { class: "status err" }, el("span", { text: "Couldn’t read: " + draft.unreadable })) : null,
+    scansFiles?.length ? el("div", { class: "thumbs" }, scansFiles.map(b => { const u = URL.createObjectURL(b); return el("a", { href: u, target: "_blank", rel: "noopener", class: "thumb" }, el("img", { src: u, alt: "Your photo" })); })) : null,
+    el("label", { class: "f", for: "ed-sec" }, "Section"), sel, nw,
+    fields, statusBox,
+    el("div", { class: "foot" }, el("button", { class: "btn", onclick: () => closeSheet() }, "Cancel"), save),
+  );
+  panel.querySelector("#ed-title").value = r.title || "";
+  panel.querySelector("#ed-serves").value = r.serves || "";
+  panel.querySelector("#ed-time").value = r.time || "";
+  panel.querySelector("#ed-head").value = r.headnote || "";
+  panel.querySelector("#ed-ing").value = groupsToText(r.groups, "ingredients");
+  panel.querySelector("#ed-steps").value = groupsToText(r.groups, "steps");
+  panel.querySelector("#ed-tips").value = (r.tips || []).join("\n");
+  panel.querySelector("#ed-credit").value = r.credit || "";
+  const show = (m, err, spin) => statusBox.replaceChildren(el("div", { class: "status" + (err ? " err" : "") }, spin ? el("div", { class: "spin" }) : null, el("span", { text: m })));
+
+  async function doSave() {
+    const v = id => panel.querySelector(id).value.trim();
+    const title = v("#ed-title");
+    let sec = sel.value === "__new" ? newSectionId(nw.value) : sel.value;
+    if (!title) { show("Give the recipe a title.", true); return; }
+    if (!sec) { show("Choose a section.", true); return; }
+    const groups = textToGroups(panel.querySelector("#ed-ing").value, panel.querySelector("#ed-steps").value);
+    if (!groups.length) { show("Add at least the ingredients or the method.", true); return; }
+    save.disabled = true; show("Saving…", false, true);
+    try {
+      if (sel.value === "__new") await addSection(sec, nw.value.trim());
+      const data = { title, section: sec, serves: v("#ed-serves"), time: v("#ed-time"), headnote: v("#ed-head"), groups, tips: panel.querySelector("#ed-tips").value.split("\n").map(s => s.trim()).filter(Boolean), credit: v("#ed-credit") };
+      if (editing) {
+        await C.db.doc("recipes/" + recipe.id).update(data);
+        closeSheet(); render();
+        return;
+      }
+      let photo = null, scans = [];
+      if (C.assets) {
+        try {
+          if (dish) photo = (await C.assets.upload(await shrink(dish, 1400), { type: "image/jpeg" })).id;
+          for (const b of scansFiles || []) scans.push((await C.assets.upload(b, { type: "image/jpeg" })).id);
+        } catch { show("Saving without photos: they couldn’t be uploaded.", false, true); }
+      }
+      const uid = C.user ? await C.user.id().catch(() => null) : null;
+      const id = (norm(title).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "recipe") + "-" + Math.random().toString(36).slice(2, 6);
+      await C.db.doc("recipes/" + id).set({ ...data, book: "Added", origin: origin || "photo", photo, scans, caption: "", page: null, addedBy: uid, addedAt: Date.now() });
+      closeSheet(); location.hash = id; render();
+    } catch (e) {
+      show("Couldn’t save it. " + dbMsg(e), true);
+      save.disabled = false;
+    }
+  }
+}
+
+async function addSection(id, name) {
+  if (sections().some(s => s.id === id)) return;
+  const list = S.extra.concat([{ id, name }]);
+  await C.db.doc("meta/sections").set({ list });
+}
+
+document.getElementById("fab").addEventListener("click", openAdd);
+
+/* ---------- Boot ---------- */
+async function loadNames() {
+  const ids = [...new Set(S.recipes.map(r => r.addedBy).filter(Boolean))].filter(id => !(id in S.names));
+  if (!ids.length || !C.user?.profiles) return;
+  try { const ps = await C.user.profiles(ids); for (const id of ids) S.names[id] = ps[id]?.name || ""; render(); } catch {}
+}
+
+async function boot() {
+  render();
+  if (!window.claude?.use) { C.db = false; showOutside(); return; }
+  const db = await window.claude.use("db");
+  if (!db) { C.db = false; showOutside(); return; }
+  C.db = db;
+  db.collection("recipes").onSnapshot(snap => {
+    S.recipes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    S.loaded = true; render(); loadNames();
+  }, () => { S.loaded = true; notice("The recipes stopped updating. Reload the page to reconnect."); });
+  db.doc("meta/sections").onSnapshot(s => { S.extra = (s.exists && Array.isArray(s.data().list)) ? s.data().list : []; render(); }, () => {});
+  const [user, assets, sample] = await Promise.all([window.claude.use("user"), window.claude.use("assets"), window.claude.use("sample")]);
+  C.user = user; C.assets = assets; C.sample = sample;
+  if (user) S.canWrite = await user.can("data.write").catch(() => null);
+  if (sample) C.limits = await sample.limits().catch(() => null);
+  if (sample && C.limits && !C.limits.images) C.sample = null;
+  render();
+}
+function showOutside() {
+  S.loaded = true;
+  notice("Open this page on claude.ai while signed in to see the recipes and add your own.");
+}
+function notice(msg) { S.notice = msg; render(); }
+boot();
+</script>
