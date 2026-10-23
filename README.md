@@ -4,7 +4,8 @@ The family recipe app for *The Optimist Cookbook*. It is hosted as a private cla
 https://claude.ai/artifact/3otud1RsnLVJ4jgmbYRp2d
 
 ## What it does
-- Lists all 49 recipes from The Optimist Cookbook, by chapter, with their photos.
+- Lists all 362 recipes: the 49 from The Optimist Cookbook (Vol. 1, with photos) and 313 from the Vol. 2 draft, by chapter.
+- Vol. 2 recipes show a "Vol. 2" tag, their source, any Afrikaans name, and a red "Check before printing" note where the source was incomplete. They cannot be deleted from the app.
 - Search by recipe name or ingredient.
 - **Add recipe**: photograph a recipe (one or more photos) or upload a social media screenshot. Claude reads it, lays it out in the cookbook format (title, introduction, serves | total time, ingredients and method per part, tips) and files it in the section you choose. You check and edit it before it is saved.
 - Edit any recipe; delete recipes the family added (book recipes cannot be deleted from the app).
@@ -15,10 +16,12 @@ https://claude.ai/artifact/3otud1RsnLVJ4jgmbYRp2d
 - `tools/build.py` - inlines the Optimist font and cover texture, writing `dist/the-optimist-cookbook-app.html`, which is the file published to the artifact.
 - `data/transcriptions/r1-r5.txt` - the book recipes, transcribed by hand from the PDF (one file per chapter). `tools/transcriptions_to_json.py` turns them into `data/recipes.json`.
 - `data/photo-asset-ids.txt` - which artifact asset holds each book photo.
+- `data/vol2/vol2.json` - the recipe data from the Vol. 2 draft artifact. `tools/vol2_to_app.py` converts it to `data/vol2/app-recipes.json` (skipping the 49 Vol. 1 recipes already in the app), which was written to the database.
+- `tools/vol2_apply_checks.py` - the check-note fixes approved on 23 Oct 2026 (Certain or Likely only). Resolved notes are kept in `resolvedChecks` with their confidence rating.
 
 Fonts: Optimist (titles, custom font) and Aleo (body, Google Fonts - the same body font the printed book uses).
 
 ## Data model (`recipes/<id>`)
-`title, section, page, serves, time, headnote, groups[{heading, ingredients[], steps[]}], tips[], caption, credit, book, origin (book|photo|social), photo (asset id), scans (asset ids), addedBy (account id), addedByName (the name the person typed), addedAt`
+`title, altTitle, section, page (Vol. 1 sort order only, not shown), serves, time, headnote, groups[{heading, ingredients[], steps[]}], tips[], checks[], resolvedChecks[], caption, credit, source, book ("The Optimist Cookbook" | "The Optimist Cookbook Vol. 2" | "Added"), origin (book|vol2|photo|social), photo (asset id), scans (asset ids), addedBy (account id), addedByName (the name the person typed), addedAt`
 
 Extra sections created in the app are stored in `meta/sections`.

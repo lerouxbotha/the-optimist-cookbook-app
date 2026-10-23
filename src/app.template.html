@@ -98,6 +98,9 @@ main { padding-block: 18px 120px; }
 .steps li { margin-bottom: 9px; padding-left: 2px; }
 .steps li::marker { font-family: var(--title); color: var(--orange-ink); }
 .tip { margin-top: 18px; padding: 12px 14px; border-left: 4px solid var(--orange); background: var(--page); border-radius: 0 6px 6px 0; }
+.check { margin-top: 18px; padding: 12px 14px; border-left: 4px solid #B42318; background: #FDECEA; color: #1F1A17; border-radius: 0 6px 6px 0; }
+.check b { color: #B42318; }
+.alttitle { margin: -4px 0 10px; font-style: italic; color: var(--muted); }
 .caption { margin-top: 18px; font-family: var(--title); font-size: 15px; color: var(--muted); }
 .source { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
@@ -177,10 +180,16 @@ const BASE_SECTIONS = [
   { id: "padkos", name: "Padkos" },
   { id: "tv", name: "Cooking with TV" },
   { id: "family", name: "Family Favourites" },
+  { id: "starters", name: "Starters, Soups & Small Plates" },
+  { id: "mains", name: "Mains" },
+  { id: "braai", name: "Braai & Potjie" },
+  { id: "breads", name: "Breads & Bakes" },
   { id: "sweet", name: "Sweet Dreams" },
+  { id: "basics", name: "Sauces, Sides & Basics" },
   { id: "drinks", name: "Cocktails and Drinks" },
 ];
 const BOOK = "The Optimist Cookbook";
+const VOL2 = "The Optimist Cookbook Vol. 2";
 const S = { recipes: [], loaded: false, extra: [], section: "all", q: "", canWrite: null, names: {} };
 const C = { db: null, user: null, assets: null, sample: null, limits: null };
 
@@ -200,19 +209,20 @@ const sections = () => BASE_SECTIONS.concat(S.extra.filter(x => !BASE_SECTIONS.s
 const sectionName = id => (sections().find(s => s.id === id) || {}).name || "Other";
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const photoSrc = id => (id ? "/_blob/" + id : null);
-const isBook = r => r.book === BOOK;
+const isVol2 = r => r.book === VOL2;
+const isBook = r => r.book === BOOK || isVol2(r);
 
 function sortKey(r) {
   const i = sections().findIndex(s => s.id === r.section);
-  return [i < 0 ? 99 : i, isBook(r) ? 0 : 1, isBook(r) ? (r.page || 0) : -(r.addedAt || 0)];
+  return [i < 0 ? 99 : i, isVol2(r) ? 1 : isBook(r) ? 0 : 2, isVol2(r) ? 0 : isBook(r) ? (r.page || 0) : -(r.addedAt || 0)];
 }
-function cmp(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; }
+function cmp(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return String(a.title || "").localeCompare(String(b.title || "")); }
 
 function matches(r) {
   if (S.section === "added") { if (isBook(r)) return false; }
   else if (S.section !== "all" && r.section !== S.section) return false;
   if (!S.q) return true;
-  const hay = norm([r.title, r.headnote, r.credit, ...(r.groups || []).flatMap(g => [g.heading, ...(g.ingredients || [])])].join(" "));
+  const hay = norm([r.title, r.altTitle, r.headnote, r.credit, r.source, ...(r.groups || []).flatMap(g => [g.heading, ...(g.ingredients || [])])].join(" "));
   return norm(S.q).split(/\s+/).every(w => hay.includes(w));
 }
 
@@ -237,7 +247,8 @@ function card(r) {
     ? el("div", { class: "ph" }, el("img", { src, alt: "", loading: "lazy", onerror: e => { e.target.parentNode.replaceWith(emptyPh(r)); } }))
     : emptyPh(r);
   if (!isBook(r)) ph.append(el("span", { class: "tag", text: r.origin === "social" ? "Social" : "Added" }));
-  const meta = isBook(r) ? `p. ${r.page}` : (r.credit ? r.credit : addedByText(r));
+  else if (isVol2(r)) ph.append(el("span", { class: "tag", text: "Vol. 2" }));
+  const meta = isBook(r) ? (r.credit || (isVol2(r) ? "Vol. 2" : "Vol. 1")) : (r.credit ? r.credit : addedByText(r));
   return el("button", { class: "card", onclick: () => open(r.id) }, ph, el("span", { class: "t", text: r.title }), el("span", { class: "meta", text: meta }));
 }
 function emptyPh(r) { return el("div", { class: "ph empty" }, el("span", { text: r.title })); }
@@ -278,6 +289,7 @@ function renderRecipe(r) {
   const body = el("div", { class: "rbody" });
   body.append(el("button", { class: "back", onclick: () => { location.hash = ""; } }, "← All recipes"));
   body.append(el("h1", { class: "rtitle t", text: r.title }));
+  if (r.altTitle) body.append(el("p", { class: "alttitle", text: r.altTitle }));
   if (r.headnote) body.append(el("p", { class: "headnote", text: r.headnote }));
   const y = [];
   if (r.serves) y.push(el("span", {}, el("b", { text: /^(makes|serves)\b/i.test(r.serves) ? "" : "Serves " }), r.serves));
@@ -291,9 +303,11 @@ function renderRecipe(r) {
     body.append(box);
   }
   for (const t of r.tips || []) body.append(el("div", { class: "tip" }, el("b", { text: "Tip: " }), t));
+  for (const t of r.checks || []) body.append(el("div", { class: "check" }, el("b", { text: "Check before printing: " }), t));
   if (r.caption) body.append(el("div", { class: "caption", text: r.caption }));
-  const src = [el("span", { text: isBook(r) ? `${BOOK}, page ${r.page}` : addedByText(r) }), el("span", { text: sectionName(r.section) })];
+  const src = [el("span", { text: isVol2(r) ? VOL2 : isBook(r) ? BOOK : addedByText(r) }), el("span", { text: sectionName(r.section) })];
   if (r.credit) src.push(el("span", { text: "Credit: " + r.credit }));
+  if (r.source) src.push(el("span", { text: "From: " + r.source }));
   body.append(el("div", { class: "source" }, src));
   if (r.scans?.length) body.append(el("div", { class: "hint", text: "Original photos" }), el("div", { class: "scans" }, r.scans.map(id => el("a", { href: photoSrc(id), target: "_blank", rel: "noopener" }, el("img", { src: photoSrc(id), alt: "Original recipe photo" })))));
   if (S.canWrite !== false && C.db) {
