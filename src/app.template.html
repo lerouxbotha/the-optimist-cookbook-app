@@ -56,6 +56,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .chip { flex: none; border: 1px solid #4A4F4A; background: transparent; color: #EDEAE4; border-radius: 999px; padding: 6px 14px; font-size: 14px; white-space: nowrap; }
 .chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #151715; }
 .chip small { opacity: .7; margin-left: 4px; }
+.stories { margin-top: 8px; align-items: center; }
+.storylab { flex: none; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #A9A49C; margin-right: 2px; }
+.tagchip { padding: 4px 12px; font-size: 13px; border-style: dashed; }
+.tagchip[aria-pressed="true"] { border-style: solid; }
 
 /* List */
 main { padding-block: 18px 120px; }
@@ -101,6 +105,7 @@ main { padding-block: 18px 120px; }
 .check { margin-top: 18px; padding: 12px 14px; border-left: 4px solid #B42318; background: #FDECEA; color: #1F1A17; border-radius: 0 6px 6px 0; }
 .check b { color: #B42318; }
 .alttitle { margin: 2px 0 12px; font-style: italic; color: var(--muted); }
+.storypick { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 15px; }
 .caption { margin-top: 18px; font-family: var(--title); font-size: 15px; color: var(--muted); }
 .source { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
@@ -165,7 +170,8 @@ textarea.in { min-height: 120px; resize: vertical; line-height: 1.45; }
 <div class="band gutter" id="band">
   <div class="wrap">
     <input class="search" id="q" type="search" placeholder="Search recipes or ingredients" autocomplete="off" aria-label="Search recipes or ingredients">
-    <div class="chips" id="chips" role="toolbar" aria-label="Sections"></div>
+    <div class="chips" id="chips" role="toolbar" aria-label="Courses"></div>
+    <div class="chips stories" id="stories" role="toolbar" aria-label="Stories"></div>
   </div>
 </div>
 <main class="gutter"><div class="wrap" id="view"></div></main>
@@ -177,20 +183,22 @@ textarea.in { min-height: 120px; resize: vertical; line-height: 1.45; }
 
 <script>
 const BASE_SECTIONS = [
-  { id: "padkos", name: "Padkos" },
-  { id: "tv", name: "Cooking with TV" },
-  { id: "family", name: "Family Favourites" },
   { id: "starters", name: "Starters, Soups & Small Plates" },
   { id: "mains", name: "Mains" },
   { id: "braai", name: "Braai & Potjie" },
   { id: "breads", name: "Breads & Bakes" },
   { id: "sweet", name: "Sweet Dreams" },
-  { id: "basics", name: "Sauces, Sides & Basics" },
+  { id: "basics", name: "Sides, Sauces & Basics" },
   { id: "drinks", name: "Cocktails and Drinks" },
 ];
 const BOOK = "The Optimist Cookbook";
 const VOL2 = "The Optimist Cookbook Vol. 2";
-const S = { recipes: [], loaded: false, extra: [], section: "all", q: "", canWrite: null, names: {} };
+const STORIES = [
+  { id: "family", name: "Family" },
+  { id: "padkos", name: "Food Truck & Padkos" },
+  { id: "tv", name: "TV & Chefs" },
+];
+const S = { recipes: [], loaded: false, extra: [], section: "all", story: null, q: "", canWrite: null, names: {} };
 const C = { db: null, user: null, assets: null, sample: null, limits: null };
 
 function el(tag, attrs, ...kids) {
@@ -211,6 +219,8 @@ const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ
 const photoSrc = id => (id ? "/_blob/" + id : null);
 const isVol2 = r => r.book === VOL2;
 const isBook = r => r.book === BOOK || isVol2(r);
+const storiesOf = r => [...(r.stories || []), ...(r.book === BOOK ? ["vol1"] : []), ...(isBook(r) ? [] : ["added"])];
+const storyName = id => (STORIES.find(x => x.id === id) || {}).name;
 
 function sortKey(r) {
   const i = sections().findIndex(s => s.id === r.section);
@@ -219,8 +229,8 @@ function sortKey(r) {
 function cmp(a, b) { const x = sortKey(a), y = sortKey(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return String(a.title || "").localeCompare(String(b.title || "")); }
 
 function matches(r) {
-  if (S.section === "added") { if (isBook(r)) return false; }
-  else if (S.section !== "all" && r.section !== S.section) return false;
+  if (S.section !== "all" && r.section !== S.section) return false;
+  if (S.story && !storiesOf(r).includes(S.story)) return false;
   if (!S.q) return true;
   const hay = norm([r.title, r.altTitle, r.headnote, r.credit, r.source, ...(r.groups || []).flatMap(g => [g.heading, ...(g.ingredients || [])])].join(" "));
   return norm(S.q).split(/\s+/).every(w => hay.includes(w));
@@ -235,8 +245,14 @@ function renderChips() {
   const mk = (id, name, n) => el("button", { class: "chip", "aria-pressed": String(S.section === id), onclick: () => { S.section = id; render(); } }, name, n != null ? el("small", { text: String(n) }) : null);
   box.append(mk("all", "All recipes", S.recipes.length));
   const added = S.recipes.filter(r => !isBook(r)).length;
-  if (added) box.append(mk("added", "Added by the family", added));
   for (const s of sections()) box.append(mk(s.id, s.name, counts[s.id] || 0));
+  const tbox = document.getElementById("stories");
+  tbox.replaceChildren();
+  const sc = {};
+  for (const r of S.recipes) for (const t of storiesOf(r)) sc[t] = (sc[t] || 0) + 1;
+  const tags = STORIES.concat([{ id: "vol1", name: "Vol. 1" }], added ? [{ id: "added", name: "Added in the app" }] : []);
+  tbox.append(el("span", { class: "storylab", text: "Story" }));
+  for (const t of tags) tbox.append(el("button", { class: "chip tagchip", "aria-pressed": String(S.story === t.id), onclick: () => { S.story = S.story === t.id ? null : t.id; render(); } }, t.name, el("small", { text: String(sc[t.id] || 0) })));
   document.getElementById("count").textContent = S.loaded ? `${S.recipes.length} recipes` + (added ? ` · ${added} added` : "") : "";
 }
 
@@ -308,6 +324,8 @@ function renderRecipe(r) {
   const src = [el("span", { text: isVol2(r) ? VOL2 : isBook(r) ? BOOK : addedByText(r) }), el("span", { text: sectionName(r.section) })];
   if (r.credit) src.push(el("span", { text: "Credit: " + r.credit }));
   if (r.source) src.push(el("span", { text: "From: " + r.source }));
+  const st = (r.stories || []).map(storyName).filter(Boolean);
+  if (st.length) src.push(el("span", { text: "Story: " + st.join(", ") }));
   body.append(el("div", { class: "source" }, src));
   if (r.scans?.length) body.append(el("div", { class: "hint", text: "Original photos" }), el("div", { class: "scans" }, r.scans.map(id => el("a", { href: photoSrc(id), target: "_blank", rel: "noopener" }, el("img", { src: photoSrc(id), alt: "Original recipe photo" })))));
   if (S.canWrite !== false && C.db) {
@@ -366,8 +384,8 @@ function sheet(...kids) {
 }
 
 function sectionSelect(value, id) {
-  const sel = el("select", { class: "in", id }, el("option", { value: "", text: "Choose a section" }), sections().map(s => el("option", { value: s.id, text: s.name, selected: s.id === value })), el("option", { value: "__new", text: "+ New section…" }));
-  const nw = el("input", { class: "in", id: id + "-new", placeholder: "Name of the new section", hidden: true, style: "margin-top:8px" });
+  const sel = el("select", { class: "in", id }, el("option", { value: "", text: "Choose a course" }), sections().map(s => el("option", { value: s.id, text: s.name, selected: s.id === value })), el("option", { value: "__new", text: "+ New course…" }));
+  const nw = el("input", { class: "in", id: id + "-new", placeholder: "Name of the new course", hidden: true, style: "margin-top:8px" });
   sel.addEventListener("change", () => { nw.hidden = sel.value !== "__new"; if (!nw.hidden) nw.focus(); });
   return [sel, nw];
 }
@@ -406,7 +424,7 @@ function openAdd() {
 
   async function readRecipe() {
     const section = sel.value === "__new" ? newSectionId(nw.value) : sel.value;
-    if (!section) { showStatus("Choose the section this recipe belongs in.", true); sel.focus(); return; }
+    if (!section) { showStatus("Choose the course this recipe belongs in.", true); sel.focus(); return; }
     const who = nameIn.value.trim();
     if (!who) { showStatus("Add your name so the recipe shows who added it.", true); nameIn.focus(); return; }
     rememberName(who);
@@ -432,7 +450,7 @@ function openAdd() {
     el("div", { class: "panelhead" }, el("div", {}, el("h2", { class: "t", text: "Add a recipe" }), el("p", { class: "sub", text: "The app reads the photos and lays the recipe out like a page of the book. You check it before it’s saved." })), el("button", { class: "x", "aria-label": "Close", onclick: () => closeSheet() }, "×")),
     kinds,
     el("label", { class: "f", for: "add-name" }, "Your name"), nameIn,
-    el("label", { class: "f", for: "add-sec" }, "Section"), sel, nw,
+    el("label", { class: "f", for: "add-sec" }, "Course"), sel, nw,
     el("label", { class: "f", for: "add-files" }, "Recipe photos ", el("small", { text: `(up to ${maxN}, in page order)` })),
     el("div", { class: "drop" }, el("button", { class: "btn primary", onclick: () => input.click() }, "Take or choose photos"), el("span", { class: "hint", text: "On your phone, choose Take Photo or Camera to use the camera." }), input, thumbs),
     credit,
@@ -551,7 +569,9 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     el("div", { class: "panelhead" }, el("div", {}, el("h2", { class: "t", text: editing ? "Edit recipe" : "Check the recipe" }), el("p", { class: "sub", text: editing ? "Changes show for everyone straight away." : "Compare it with your photos and fix anything the app misread." })), el("button", { class: "x", "aria-label": "Close", onclick: () => closeSheet() }, "×")),
     draft?.unreadable ? el("div", { class: "status err" }, el("span", { text: "Couldn’t read: " + draft.unreadable })) : null,
     scansFiles?.length ? el("div", { class: "thumbs" }, scansFiles.map(b => { const u = URL.createObjectURL(b); return el("a", { href: u, target: "_blank", rel: "noopener", class: "thumb" }, el("img", { src: u, alt: "Your photo" })); })) : null,
-    el("label", { class: "f", for: "ed-sec" }, "Section"), sel, nw,
+    el("label", { class: "f", for: "ed-sec" }, "Course"), sel, nw,
+    el("div", { class: "f" }, "Story ", el("small", { text: "(optional)" })),
+    el("div", { class: "storypick" }, STORIES.map(t => el("label", {}, el("input", { type: "checkbox", value: t.id, checked: (r.stories || []).includes(t.id) }), " " + t.name))),
     fields, statusBox,
     el("div", { class: "foot" }, el("button", { class: "btn", onclick: () => closeSheet() }, "Cancel"), save),
   );
@@ -572,7 +592,7 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     const title = v("#ed-title");
     let sec = sel.value === "__new" ? newSectionId(nw.value) : sel.value;
     if (!title) { show("Give the recipe a title.", true); return; }
-    if (!sec) { show("Choose a section.", true); return; }
+    if (!sec) { show("Choose a course.", true); return; }
     const groups = textToGroups(panel.querySelector("#ed-ing").value, panel.querySelector("#ed-steps").value);
     if (!groups.length) { show("Add at least the ingredients or the method.", true); return; }
     const who = whoIn ? whoIn.value.trim() : "";
@@ -580,7 +600,8 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     save.disabled = true; show("Saving…", false, true);
     try {
       if (sel.value === "__new") await addSection(sec, nw.value.trim());
-      const data = { title, section: sec, serves: v("#ed-serves"), time: v("#ed-time"), headnote: v("#ed-head"), groups, tips: panel.querySelector("#ed-tips").value.split("\n").map(s => s.trim()).filter(Boolean), credit: v("#ed-credit") };
+      const stories = [...panel.querySelectorAll(".storypick input:checked")].map(i => i.value);
+      const data = { title, section: sec, stories, serves: v("#ed-serves"), time: v("#ed-time"), headnote: v("#ed-head"), groups, tips: panel.querySelector("#ed-tips").value.split("\n").map(s => s.trim()).filter(Boolean), credit: v("#ed-credit") };
       if (whoIn) data.addedByName = who;
       if (editing) {
         await C.db.doc("recipes/" + recipe.id).update(data);
