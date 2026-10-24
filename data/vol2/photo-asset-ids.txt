@@ -297,3 +297,14 @@ vesper-masterclass-version aa74461585226b1080a5459db9a87097
 wet-gin-martini 44ed568b36def165c60db41063f12a69
 wild-mushroom-tortellini f33874caf5f3a365d25cda415b0f1fdd
 yoghurt-loaf 7a15e3bda188c8c3972afe0f5dd86bb6
+by-the-seashore-seared-scallops-with-pak-choi-pickles 3f4c15d65884ecb9aab9fc8625229e91
+cauliflower-soup-with-chilli-butter 720d7a569f01d76f65dbca047fa421ff
+coconut-rice afade4e1148e42feaa299c3dea06c477
+curried-lamb-pot a3c1de51672bd1744be7c9862120fe28
+matt-manning-s-wild-boar-scotch-eggs d24546b2000c75570cbaa62764197503
+no-bake-raspberry-cheesecake 25f2ebe4206cefca342c8a99e41b3af5
+snowflake-apple-pie ee8e319c8cd18cda03f4c7ebbba585c8
+three-mushroom-pasties ea75c91923a6f9226aee404f6ce9746c
+traditional-roosterkoek 848ef3ee04fc2cf91c6c807ed3da1736
+tuna-or-bacon-pinwheels 5310eb72d86888f8f38b61cd604c4a96
+wild-coast-seafood-potjie-with-dombolo d5755a33b6577f68604e55c438dd77da
