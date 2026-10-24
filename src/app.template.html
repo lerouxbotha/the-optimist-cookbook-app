@@ -210,7 +210,7 @@ function el(tag, attrs, ...kids) {
     else if (k === "text") n.textContent = v;
     else n.setAttribute(k, v === true ? "" : v);
   }
-  for (const c of kids.flat()) if (c != null && c !== false) n.append(c instanceof Node ? c : String(c));
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) n.append(c instanceof Node ? c : String(c));
   return n;
 }
 const sections = () => BASE_SECTIONS.concat(S.extra.filter(x => !BASE_SECTIONS.some(b => b.id === x.id)));
