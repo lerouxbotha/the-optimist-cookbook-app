@@ -563,6 +563,25 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     ...f("ed-credit", "Credit", r.credit, { ph: "@creator, a book, or who gave you the recipe", small: "(optional)" }),
     ...(editing && isBook(recipe) ? [] : f("ed-who", "Added by", r.addedByName, { ph: "Your name" })),
   ];
+  let newPhoto = null, dropPhoto = false;
+  const oldSrc = editing ? photoSrc(recipe.photo) : null;
+  const photoBox = el("div", { class: "thumbs" });
+  const photoIn = el("input", { type: "file", accept: "image/*", id: "ed-photo", hidden: true });
+  const drawPhoto = () => {
+    const file = newPhoto || (!dropPhoto && !editing ? dish : null);
+    const src = file ? URL.createObjectURL(file) : (!dropPhoto ? oldSrc : null);
+    photoBox.replaceChildren(src
+      ? el("div", { class: "thumb" }, el("img", { src, alt: "Dish photo" }), el("button", { "aria-label": "Remove photo", onclick: () => { newPhoto = null; dropPhoto = true; drawPhoto(); } }, "×"))
+      : el("span", { class: "hint", text: "No photo yet." }));
+  };
+  photoIn.addEventListener("change", () => { if (photoIn.files[0]) { newPhoto = photoIn.files[0]; dropPhoto = false; } photoIn.value = ""; drawPhoto(); });
+  const photoField = [
+    el("label", { class: "f", for: "ed-photo" }, "Dish photo ", el("small", { text: "(optional)" })),
+    C.assets
+      ? el("div", {}, el("button", { class: "btn", onclick: () => photoIn.click() }, (oldSrc || dish) ? "Change photo" : "Add a photo"), photoIn, photoBox)
+      : el("div", {}, el("span", { class: "hint", text: "Only Editors can add photos. Ask Leroux to make you an Editor." }), photoBox),
+  ];
+  drawPhoto();
   const statusBox = el("div");
   const save = el("button", { class: "btn primary", onclick: () => doSave() }, editing ? "Save changes" : "Add to the cookbook");
   const panel = sheet(
@@ -572,7 +591,7 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
     el("label", { class: "f", for: "ed-sec" }, "Course"), sel, nw,
     el("div", { class: "f" }, "Story ", el("small", { text: "(optional)" })),
     el("div", { class: "storypick" }, STORIES.map(t => el("label", {}, el("input", { type: "checkbox", value: t.id, checked: (r.stories || []).includes(t.id) }), " " + t.name))),
-    fields, statusBox,
+    photoField, fields, statusBox,
     el("div", { class: "foot" }, el("button", { class: "btn", onclick: () => closeSheet() }, "Cancel"), save),
   );
   panel.querySelector("#ed-title").value = r.title || "";
@@ -604,6 +623,11 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
       const data = { title, section: sec, stories, serves: v("#ed-serves"), time: v("#ed-time"), headnote: v("#ed-head"), groups, tips: panel.querySelector("#ed-tips").value.split("\n").map(s => s.trim()).filter(Boolean), credit: v("#ed-credit") };
       if (whoIn) data.addedByName = who;
       if (editing) {
+        if (newPhoto) {
+          show("Uploading the photo…", false, true);
+          try { data.photo = (await C.assets.upload(await shrink(newPhoto, 1400), { type: "image/jpeg" })).id; }
+          catch { show("The photo couldn’t be uploaded, so nothing was saved. Try a different photo, or check your connection.", true); save.disabled = false; return; }
+        } else if (dropPhoto) data.photo = null;
         await C.db.doc("recipes/" + recipe.id).update(data);
         closeSheet(); render();
         return;
@@ -611,7 +635,8 @@ function openEditor({ recipe, draft, section, newSectionName, scansFiles, dish, 
       let photo = null, scans = [];
       if (C.assets) {
         try {
-          if (dish) photo = (await C.assets.upload(await shrink(dish, 1400), { type: "image/jpeg" })).id;
+          const dishFile = newPhoto || (dropPhoto ? null : dish);
+          if (dishFile) photo = (await C.assets.upload(await shrink(dishFile, 1400), { type: "image/jpeg" })).id;
           for (const b of scansFiles || []) scans.push((await C.assets.upload(b, { type: "image/jpeg" })).id);
         } catch { show("Saving without photos: they couldn’t be uploaded.", false, true); }
       }
@@ -666,3 +691,4 @@ function showOutside() {
 function notice(msg) { S.notice = msg; render(); }
 boot();
 </script>
+
